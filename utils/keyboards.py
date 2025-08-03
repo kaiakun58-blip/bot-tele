@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 """
-Keyboard layouts for Telegram Anonymous Chat Bot
+Dynamic keyboard layouts for ObrolanId
 """
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
-def get_main_menu():
-    """Get main menu keyboard with shortcuts"""
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("Find a partner"), KeyboardButton("Search Pro")],
-        [KeyboardButton("My Profile"), KeyboardButton("Upgrade to Pro")],
-        [KeyboardButton("Play Quiz"), KeyboardButton("📊 Stats")],
-        [KeyboardButton("🔍 Help"), KeyboardButton("⚙️ Settings")],
-    ], resize_keyboard=True)
+def get_main_menu(is_pro=False):
+    """Get dynamic main menu keyboard based on user status"""
+    if is_pro:
+        return ReplyKeyboardMarkup([
+            [KeyboardButton("🔍 Find Partner"), KeyboardButton("🎯 Search Pro")],
+            [KeyboardButton("👤 My Profile"), KeyboardButton("📊 Stats")],
+            [KeyboardButton("🎮 Play Quiz"), KeyboardButton("🔍 Help")],
+        ], resize_keyboard=True)
+    else:
+        return ReplyKeyboardMarkup([
+            [KeyboardButton("🔍 Find Partner"), KeyboardButton("👥 Search by Gender")],
+            [KeyboardButton("👤 My Profile"), KeyboardButton("✨ Upgrade to Pro")],
+            [KeyboardButton("📊 Stats"), KeyboardButton("🔍 Help")],
+        ], resize_keyboard=True)
 
 def get_chat_menu():
-    """Get chat menu keyboard with shortcuts"""
+    """Get chat session keyboard - focused on chat controls"""
     return ReplyKeyboardMarkup([
-        [KeyboardButton("Next"), KeyboardButton("Stop")],
-        [KeyboardButton("🏠 Menu"), KeyboardButton("👤 Profile"), KeyboardButton("📊 Stats")],
-        [KeyboardButton("Secret Mode"), KeyboardButton("Feedback")],
+        [KeyboardButton("⏭️ Next"), KeyboardButton("🛑 Stop")],
+        [KeyboardButton("🔒 Secret Mode"), KeyboardButton("⭐ Feedback")],
     ], resize_keyboard=True)
 
 def get_group_menu():
@@ -48,3 +53,20 @@ def get_hobbies_keyboard():
         [KeyboardButton("Drawing"), KeyboardButton("Coding"), KeyboardButton("Photography")],
         [KeyboardButton("Other")]
     ], resize_keyboard=True, one_time_keyboard=True)
+
+def get_gender_search_keyboard():
+    """Get gender search keyboard for non-Pro users"""
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("👨 Male"), KeyboardButton("👩 Female")],
+        [KeyboardButton("🌈 Other"), KeyboardButton("🎲 Any Gender")],
+        [KeyboardButton("🔙 Back to Menu")]
+    ], resize_keyboard=True, one_time_keyboard=True)
+
+def get_context_keyboard(user_id, is_in_chat=False, is_pro=False):
+    """Get context-aware keyboard based on user session"""
+    if is_in_chat:
+        # User is in chat session - show chat controls
+        return get_chat_menu()
+    else:
+        # User is in main menu - show main options
+        return get_main_menu(is_pro)

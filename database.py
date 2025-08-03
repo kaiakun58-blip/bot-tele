@@ -233,16 +233,15 @@ def find_partner(user_id: int, gender_pref: str = None, hobby_pref: str = None,
         c.execute("SELECT blocked_id FROM block_list WHERE user_id=?", (user_id,))
         blocked_ids = [row[0] for row in c.fetchall()]
         
-        # Base query for available users - allow users without complete profile
+        # Base query for available users - simplified for basic mode
         base_query = """
             SELECT u.user_id, u.gender, u.age, u.hobbies 
             FROM user_profiles u 
             WHERE u.user_id != ? 
             AND u.is_banned = 0 
             AND u.user_id NOT IN (SELECT user_id FROM sessions)
-            AND u.user_id NOT IN (SELECT user_id FROM chat_queue WHERE user_id != ?)
         """
-        params = [user_id, user_id]
+        params = [user_id]
         
         # Add filters based on preferences (only if user has data)
         if gender_pref and gender_pref != "Any":

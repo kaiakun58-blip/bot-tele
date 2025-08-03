@@ -25,7 +25,7 @@ from telegram.ext import (
 from config import BOT_TOKEN, OWNER_ID, GENDERS, HOBBIES, LANGS, REPORT_REASONS
 from database import (
     is_profile_complete, get_user_profile, update_user_profile,
-    is_user_pro, get_user_stats, mask_username, get_top_users
+    is_user_pro, get_user_stats, mask_username, get_top_users, is_in_chat
 )
 from handlers.decorators import check_ban_status, auto_update_profile, owner_only
 from handlers.chat_handlers import start_chat, stop_chat, next_partner, forward_message
@@ -39,7 +39,8 @@ from handlers.payment_handlers import (
 )
 from utils.keyboards import (
     get_main_menu, get_chat_menu, get_gender_keyboard, 
-    get_language_keyboard, get_hobbies_keyboard
+    get_language_keyboard, get_hobbies_keyboard, get_gender_search_keyboard,
+    get_context_keyboard
 )
 
 # ========== Logging ==========
@@ -108,14 +109,16 @@ Bot untuk chat anonim dengan orang-orang baru dari seluruh Indonesia dan dunia!
         return
     
     # Returning user
-    pro_status = "✨ Pro User" if is_user_pro(user_id) else "📋 Regular User"
+    is_pro = is_user_pro(user_id)
+    pro_status = "✨ Pro User" if is_pro else "📋 Regular User"
     points = profile.get('points', 0)
+    is_chatting = is_in_chat(user_id)
     
     await update.message.reply_text(
         f"🎉 Selamat datang kembali, {user_name}!\n\n"
         f"{pro_status} • 📊 Poin: {points}\n\n"
         f"Pilih menu di bawah untuk memulai:",
-        reply_markup=get_main_menu()
+        reply_markup=get_context_keyboard(user_id, is_chatting, is_pro)
     )
 
 @check_ban_status
@@ -280,10 +283,11 @@ async def profile_hobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     update_user_profile(user_id, **profile_data)
     
+    user_is_pro = is_user_pro(user_id)
     await update.message.reply_text(
         "🎉 Profil berhasil dibuat!\n"
         "Sekarang kamu bisa mulai mencari partner chat.",
-        reply_markup=get_main_menu()
+        reply_markup=get_main_menu(user_is_pro)
     )
     
     # Clear user data
@@ -292,9 +296,13 @@ async def profile_hobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def profile_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancel profile setup"""
+    user_id = update.effective_user.id
+    user_is_pro = is_user_pro(user_id)
+    is_chatting = is_in_chat(user_id)
+    
     await update.message.reply_text(
         "❌ Setup profil dibatalkan.",
-        reply_markup=get_main_menu()
+        reply_markup=get_context_keyboard(user_id, is_chatting, user_is_pro)
     )
     context.user_data.clear()
     return ConversationHandler.END
@@ -349,6 +357,44 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ========== Statistics and Leaderboard ==========
+
+@check_ban_status
+async def handle_gender_search_non_pro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle gender search for non-Pro users"""
+    user_id = update.effective_user.id
+    
+    if is_user_pro(user_id):
+        await update.message.reply_text(
+            "✨ Kamu sudah Pro! Gunakan 'Search Pro' untuk akses fitur lengkap.",
+            reply_markup=get_main_menu(True)
+        )
+        return
+    
+    await update.message.reply_text(
+        "👥 *Search by Gender - Free Feature*\n\n"
+        "Pilih gender preference untuk partner:\n\n"
+        "💡 *Tip:* Upgrade ke Pro untuk fitur lebih lengkap:\n"
+        "• Search by Hobby\n"
+        "• Search by Age Range\n"
+        "• Advanced Multi-Filter\n"
+        "• Priority Matching",
+        parse_mode='Markdown',
+        reply_markup=get_gender_search_keyboard()
+    )
+
+async def handle_basic_gender_search(update: Update, context: ContextTypes.DEFAULT_TYPE, gender_pref: str):
+    """Handle basic gender search for non-Pro users"""
+    user_id = update.effective_user.id
+    
+    await update.message.reply_text(
+        f"🔍 Mencari partner dengan gender: {gender_pref or 'Any'}\n\n"
+        "Sedang mencari partner yang cocok...",
+        reply_markup=get_chat_menu()
+    )
+    
+    # Start search with gender preference
+    from handlers.chat_handlers import start_partner_search
+    await start_partner_search(update, context, gender_pref=gender_pref)
 
 @check_ban_status
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -417,31 +463,45 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle text messages based on current state"""
     text = update.message.text
+    user_id = update.effective_user.id
+    is_pro = is_user_pro(user_id)
+    is_chatting = is_in_chat(user_id)
     
-    if text == "Find a partner":
+    # Dynamic text matching with emoji support
+    if text in ["Find a partner", "🔍 Find Partner"]:
         await start_chat(update, context)
-    elif text == "My Profile":
+    elif text in ["My Profile", "👤 My Profile"]:
         await my_profile(update, context)
-    elif text == "Stop":
+    elif text in ["Stop", "🛑 Stop"]:
         await stop_chat(update, context)
-    elif text == "Next":
+    elif text in ["Next", "⏭️ Next"]:
         await next_partner(update, context)
-    elif text == "Search Pro":
+    elif text in ["Search Pro", "🎯 Search Pro"]:
         await search_pro_command(update, context)
-    elif text == "Upgrade to Pro":
+    elif text in ["Upgrade to Pro", "✨ Upgrade to Pro"]:
         await handle_upgrade_pro(update, context)
-    elif text in ["🏠 Menu", "⚙️ Settings"]:
-        await update.message.reply_text(
-            "🏠 Menu Utama",
-            reply_markup=get_main_menu()
-        )
-    elif text in ["👤 Profile", "My Profile"]:
-        await my_profile(update, context)
+    elif text == "👥 Search by Gender":
+        await handle_gender_search_non_pro(update, context)
     elif text in ["📊 Stats"]:
         await stats_command(update, context)
     elif text == "🔍 Help":
         await help_command(update, context)
-    elif text in ["Play Quiz", "Join Group"]:
+    elif text in ["Secret Mode", "🔒 Secret Mode"]:
+        await update.message.reply_text("🔒 Mode rahasia akan aktif untuk chat berikutnya.")
+    elif text in ["Feedback", "⭐ Feedback"]:
+        await update.message.reply_text("⭐ Terima kasih! Fitur feedback akan segera tersedia.")
+    elif text == "🔙 Back to Menu":
+        await update.message.reply_text(
+            "🏠 Menu Utama",
+            reply_markup=get_context_keyboard(user_id, is_chatting, is_pro)
+        )
+    # Gender selection for non-Pro search
+    elif text in ["👨 Male", "👩 Female", "🌈 Other", "🎲 Any Gender"]:
+        gender = text.split(" ")[1] if " " in text else "Any"
+        if gender == "Any":
+            gender = None
+        await handle_basic_gender_search(update, context, gender)
+    elif text in ["Play Quiz", "🎮 Play Quiz", "Join Group"]:
         await update.message.reply_text(
             f"🚧 Fitur '{text}' sedang dalam pengembangan. "
             "Akan segera tersedia di update berikutnya!"
