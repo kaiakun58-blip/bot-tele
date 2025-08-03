@@ -56,7 +56,18 @@ cp .env.example .env
 # Edit .env with your bot token and configuration
 ```
 
-4. **Run the bot**
+**Important**: Edit the `.env` file with your actual bot token:
+```env
+BOT_TOKEN=123456789:ABCDEF...  # Your actual bot token from @BotFather
+OWNER_ID=your_telegram_user_id  # Your Telegram user ID
+```
+
+4. **Install additional dependencies (optional)**
+```bash
+pip install python-dotenv  # For .env file support
+```
+
+5. **Run the bot**
 ```bash
 python bot.py
 ```

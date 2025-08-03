@@ -5,9 +5,31 @@ Configuration file for Telegram Anonymous Chat Bot
 import os
 from typing import List
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, will use environment variables directly
+    pass
+
 # ========== Bot Configuration ==========
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
-OWNER_ID = int(os.getenv("OWNER_ID", "123456789"))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN":
+    print("❌ Error: BOT_TOKEN tidak ditemukan!")
+    print("📝 Cara setup:")
+    print("1. Copy .env.example ke .env")
+    print("2. Edit .env dan masukkan bot token dari @BotFather")
+    print("3. Atau set environment variable: export BOT_TOKEN='your_actual_token'")
+    exit(1)
+
+OWNER_ID_STR = os.getenv("OWNER_ID", "123456789")
+try:
+    OWNER_ID = int(OWNER_ID_STR)
+except ValueError:
+    print("❌ Error: OWNER_ID harus berupa angka!")
+    exit(1)
+
 DB_PATH = os.getenv("DB_PATH", "bot_database.db")
 
 # ========== NSFW Moderation ==========

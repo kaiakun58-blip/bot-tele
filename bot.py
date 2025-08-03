@@ -29,6 +29,10 @@ from database import (
 )
 from handlers.decorators import check_ban_status, auto_update_profile, owner_only
 from handlers.chat_handlers import start_chat, stop_chat, next_partner, forward_message
+from handlers.pro_search_handlers import (
+    search_pro_command, search_type_callback, handle_gender_selection,
+    handle_hobby_selection, handle_age_input, pro_search_cancel
+)
 from utils.keyboards import (
     get_main_menu, get_chat_menu, get_gender_keyboard, 
     get_language_keyboard, get_hobbies_keyboard
@@ -351,7 +355,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await stop_chat(update, context)
     elif text == "Next":
         await next_partner(update, context)
-    elif text in ["Search Pro", "Upgrade to Pro", "Play Quiz", "Join Group"]:
+    elif text == "Search Pro":
+        await search_pro_command(update, context)
+    elif text in ["Upgrade to Pro", "Play Quiz", "Join Group"]:
         await update.message.reply_text(
             f"🚧 Fitur '{text}' sedang dalam pengembangan. "
             "Akan segera tersedia di update berikutnya!"
@@ -419,6 +425,7 @@ def main():
     application.add_handler(CommandHandler("find", start_chat))
     application.add_handler(CommandHandler("stop", stop_chat))
     application.add_handler(CommandHandler("next", next_partner))
+    application.add_handler(CommandHandler("searchpro", search_pro_command))
     
     # ========== Conversation Handlers ==========
     profile_conv = ConversationHandler(
@@ -434,6 +441,19 @@ def main():
         fallbacks=[CommandHandler("cancel", profile_cancel)]
     )
     application.add_handler(profile_conv)
+    
+    # Pro Search Conversation
+    pro_search_conv = ConversationHandler(
+        entry_points=[CommandHandler("searchpro", search_pro_command)],
+        states={
+            SEARCH_TYPE: [CallbackQueryHandler(search_type_callback)],
+            SEARCH_GENDER: [CallbackQueryHandler(handle_gender_selection)],
+            SEARCH_HOBBY: [CallbackQueryHandler(handle_hobby_selection)],
+            SEARCH_AGE_MIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_age_input)],
+        },
+        fallbacks=[CommandHandler("cancel", pro_search_cancel)]
+    )
+    application.add_handler(pro_search_conv)
     
     # ========== Callback Query Handler ==========
     application.add_handler(CallbackQueryHandler(callback_query_handler))
