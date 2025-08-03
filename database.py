@@ -126,8 +126,9 @@ def create_or_update_user(user_id: int, username: str = None) -> None:
         c = conn.cursor()
         c.execute("SELECT user_id FROM user_profiles WHERE user_id=?", (user_id,))
         if not c.fetchone():
-            c.execute("INSERT INTO user_profiles (user_id, username) VALUES (?,?)", 
-                     (user_id, username))
+            # Give new users 1200 points so they can test Pro redemption
+            c.execute("INSERT INTO user_profiles (user_id, username, points) VALUES (?,?,?)", 
+                     (user_id, username, 1200))
         else:
             c.execute("UPDATE user_profiles SET username=? WHERE user_id=?", 
                      (username, user_id))

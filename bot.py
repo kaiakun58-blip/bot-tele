@@ -33,6 +33,10 @@ from handlers.pro_search_handlers import (
     search_pro_command, search_type_callback, handle_gender_selection,
     handle_hobby_selection, handle_age_input, pro_search_cancel
 )
+from handlers.payment_handlers import (
+    handle_upgrade_pro, handle_payment_selection, handle_payment_confirmation,
+    demo_payment_command
+)
 from utils.keyboards import (
     get_main_menu, get_chat_menu, get_gender_keyboard, 
     get_language_keyboard, get_hobbies_keyboard
@@ -159,6 +163,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @auto_update_profile
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start profile setup conversation"""
+    user_id = update.effective_user.id
+    # Clear any existing conversation data
+    context.user_data.clear()
+    
     await update.message.reply_text(
         "📝 Mari lengkapi profilmu!\n\n"
         "Pilih gender kamu:",
@@ -168,15 +176,24 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def profile_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle gender selection"""
-    gender = update.message.text
+    gender = update.message.text.strip()
+    
+    # Debug logging
+    logger.info(f"User {update.effective_user.id} selected gender: {gender}")
+    
     if gender not in GENDERS:
-        await update.message.reply_text("❌ Pilihan tidak valid. Pilih dari tombol yang tersedia.")
+        await update.message.reply_text(
+            f"❌ Pilihan tidak valid: '{gender}'\n"
+            f"Pilih salah satu: {', '.join(GENDERS)}",
+            reply_markup=get_gender_keyboard()
+        )
         return PROFILE_GENDER
     
     context.user_data['gender'] = gender
     await update.message.reply_text(
-        "✅ Gender tersimpan!\n\n"
-        "Berapa umur kamu? (Masukkan angka)"
+        f"✅ Gender tersimpan: {gender}\n\n"
+        "Berapa umur kamu? (Masukkan angka 13-100)",
+        reply_markup=None  # Remove keyboard
     )
     return PROFILE_AGE
 
@@ -365,19 +382,15 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     
     if query.data == "complete_profile":
-        await query.edit_message_text("Mari lengkapi profil!")
-        # For callback queries, we need to create a fake message object
-        fake_update = Update(
-            update_id=update.update_id,
-            message=query.message,
-            callback_query=None
-        )
-        await profile_command(fake_update, context)
+        # This will be handled by the ConversationHandler
+        return
     
     elif query.data == "skip_profile":
         await query.edit_message_text(
-            "⚠️ Profil tidak lengkap mungkin mempengaruhi pengalaman chat kamu."
+            "🔍 Mode Basic - Mencari partner...\n"
+            "Profil tidak lengkap tapi tetap bisa chat!"
         )
+        # Create a proper message update for start_chat
         fake_update = Update(
             update_id=update.update_id,
             message=query.message,
@@ -395,6 +408,9 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
             callback_query=None
         )
         await stats_command(fake_update, context)
+    
+    elif query.data == "upgrade_pro":
+        await handle_upgrade_pro(update, context)
 
 # ========== Message Handlers ==========
 
@@ -412,7 +428,20 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await next_partner(update, context)
     elif text == "Search Pro":
         await search_pro_command(update, context)
-    elif text in ["Upgrade to Pro", "Play Quiz", "Join Group"]:
+    elif text == "Upgrade to Pro":
+        await handle_upgrade_pro(update, context)
+    elif text in ["🏠 Menu", "⚙️ Settings"]:
+        await update.message.reply_text(
+            "🏠 Menu Utama",
+            reply_markup=get_main_menu()
+        )
+    elif text in ["👤 Profile", "My Profile"]:
+        await my_profile(update, context)
+    elif text in ["📊 Stats"]:
+        await stats_command(update, context)
+    elif text == "🔍 Help":
+        await help_command(update, context)
+    elif text in ["Play Quiz", "Join Group"]:
         await update.message.reply_text(
             f"🚧 Fitur '{text}' sedang dalam pengembangan. "
             "Akan segera tersedia di update berikutnya!"
@@ -481,10 +510,15 @@ def main():
     application.add_handler(CommandHandler("stop", stop_chat))
     application.add_handler(CommandHandler("next", next_partner))
     application.add_handler(CommandHandler("searchpro", search_pro_command))
+    application.add_handler(CommandHandler("upgrade", handle_upgrade_pro))
+    application.add_handler(CommandHandler("pay", demo_payment_command))
     
     # ========== Conversation Handlers ==========
     profile_conv = ConversationHandler(
-        entry_points=[CommandHandler("profile", profile_command)],
+        entry_points=[
+            CommandHandler("profile", profile_command),
+            CallbackQueryHandler(lambda u, c: profile_command(u, c), pattern="^complete_profile$")
+        ],
         states={
             PROFILE_GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, profile_gender)],
             PROFILE_AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, profile_age)],
@@ -493,7 +527,11 @@ def main():
             PROFILE_LANG: [MessageHandler(filters.TEXT & ~filters.COMMAND, profile_language)],
             PROFILE_HOBBY: [MessageHandler(filters.TEXT & ~filters.COMMAND, profile_hobby)],
         },
-        fallbacks=[CommandHandler("cancel", profile_cancel)]
+        fallbacks=[CommandHandler("cancel", profile_cancel)],
+        per_chat=True,
+        per_user=True,
+        per_message=False,
+        allow_reentry=True
     )
     application.add_handler(profile_conv)
     
@@ -511,6 +549,12 @@ def main():
     application.add_handler(pro_search_conv)
     
     # ========== Callback Query Handler ==========
+    # Payment handlers (must be before general callback handler)
+    application.add_handler(CallbackQueryHandler(handle_payment_selection, pattern=r"^(buy_pro_|redeem_pro|payment_methods)"))
+    application.add_handler(CallbackQueryHandler(handle_payment_confirmation, pattern=r"^confirm_"))
+    application.add_handler(CallbackQueryHandler(handle_upgrade_pro, pattern=r"^upgrade_pro$"))
+    
+    # General callback handler (must be last)
     application.add_handler(CallbackQueryHandler(callback_query_handler))
     
     # ========== Message Handlers ==========

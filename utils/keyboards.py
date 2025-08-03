@@ -5,18 +5,20 @@ Keyboard layouts for Telegram Anonymous Chat Bot
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 def get_main_menu():
-    """Get main menu keyboard"""
+    """Get main menu keyboard with shortcuts"""
     return ReplyKeyboardMarkup([
         [KeyboardButton("Find a partner"), KeyboardButton("Search Pro")],
         [KeyboardButton("My Profile"), KeyboardButton("Upgrade to Pro")],
-        [KeyboardButton("Play Quiz"), KeyboardButton("Join Group")],
+        [KeyboardButton("Play Quiz"), KeyboardButton("📊 Stats")],
+        [KeyboardButton("🔍 Help"), KeyboardButton("⚙️ Settings")],
     ], resize_keyboard=True)
 
 def get_chat_menu():
-    """Get chat menu keyboard"""
+    """Get chat menu keyboard with shortcuts"""
     return ReplyKeyboardMarkup([
-        [KeyboardButton("Next"), KeyboardButton("Stop"), KeyboardButton("Feedback"), KeyboardButton("Poll")],
-        [KeyboardButton("Secret Mode")],
+        [KeyboardButton("Next"), KeyboardButton("Stop")],
+        [KeyboardButton("🏠 Menu"), KeyboardButton("👤 Profile"), KeyboardButton("📊 Stats")],
+        [KeyboardButton("Secret Mode"), KeyboardButton("Feedback")],
     ], resize_keyboard=True)
 
 def get_group_menu():
