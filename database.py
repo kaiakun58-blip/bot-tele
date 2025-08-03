@@ -232,7 +232,7 @@ def find_partner(user_id: int, gender_pref: str = None, hobby_pref: str = None,
         c.execute("SELECT blocked_id FROM block_list WHERE user_id=?", (user_id,))
         blocked_ids = [row[0] for row in c.fetchall()]
         
-        # Base query for available users
+        # Base query for available users - allow users without complete profile
         base_query = """
             SELECT u.user_id, u.gender, u.age, u.hobbies 
             FROM user_profiles u 
@@ -243,17 +243,17 @@ def find_partner(user_id: int, gender_pref: str = None, hobby_pref: str = None,
         """
         params = [user_id, user_id]
         
-        # Add filters based on preferences
+        # Add filters based on preferences (only if user has data)
         if gender_pref and gender_pref != "Any":
-            base_query += " AND u.gender = ?"
+            base_query += " AND (u.gender = ? OR u.gender IS NULL)"
             params.append(gender_pref)
         
         if age_min is not None and age_max is not None:
-            base_query += " AND u.age BETWEEN ? AND ?"
+            base_query += " AND (u.age BETWEEN ? AND ? OR u.age IS NULL)"
             params.extend([age_min, age_max])
         
-        # Add user completion check
-        base_query += " AND u.gender IS NOT NULL AND u.age IS NOT NULL AND u.bio IS NOT NULL AND u.photo_id IS NOT NULL"
+        # Note: Removed strict profile completion requirement
+        # Users can chat even without complete profile
         
         c.execute(base_query, params)
         candidates = c.fetchall()

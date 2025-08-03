@@ -34,11 +34,17 @@ async def start_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if profile is complete
     if not is_profile_complete(user_id):
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Lengkapi Profil", callback_data="complete_profile")],
-            [InlineKeyboardButton("Lanjutkan & Cari Acak", callback_data="skip_profile")]
+            [InlineKeyboardButton("📝 Lengkapi Profil Dulu", callback_data="complete_profile")],
+            [InlineKeyboardButton("🔍 Cari Partner (Mode Basic)", callback_data="skip_profile")]
         ])
         await update.message.reply_text(
-            "👋 Selamat datang di Anonymous Chat!\nProfilmu belum lengkap.",
+            "💡 *Profil Belum Lengkap*\n\n"
+            "Kamu bisa chat dengan mode basic, tapi profil lengkap memberikan:\n"
+            "• Hasil pencarian yang lebih baik\n"
+            "• Akses ke fitur Pro Search\n"
+            "• Pengalaman chat yang lebih personal\n\n"
+            "Pilih salah satu:",
+            parse_mode='Markdown',
             reply_markup=keyboard
         )
         return
@@ -167,7 +173,6 @@ async def background_partner_search(context: ContextTypes.DEFAULT_TYPE, user_id:
         logger.error(f"Failed to notify user about search timeout: {e}")
 
 @check_ban_status
-@require_profile
 async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Stop current chat or cancel search"""
     user_id = update.effective_user.id
@@ -198,7 +203,6 @@ async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 @check_ban_status
-@require_profile
 async def next_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Find next partner"""
     user_id = update.effective_user.id

@@ -1,4 +1,4 @@
-# 🤖 Telegram Anonymous Chat Bot
+# 🤖 ObrolanId - Anonymous Chat Bot
 
 A comprehensive Telegram bot for anonymous chat with advanced features including profile management, smart partner matching, content moderation, and gamification elements.
 

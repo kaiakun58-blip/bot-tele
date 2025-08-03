@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram Anonymous Chat Bot - Refactored Version
+ObrolanId - Anonymous Chat Bot
 A comprehensive anonymous chat bot with advanced features including:
 - Anonymous 1-on-1 and group chat
 - Advanced search with filters (Pro feature)
@@ -58,23 +58,59 @@ from config import (
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command - welcome message and menu"""
     user_id = update.effective_user.id
+    user_name = update.effective_user.first_name
     
-    if not is_profile_complete(user_id):
+    # Check if this is first time user
+    profile = get_user_profile(user_id)
+    is_new_user = not profile or not profile.get('gender')
+    
+    if is_new_user:
+        # Welcome message for new users
+        welcome_text = f"""
+🎉 *Selamat datang di ObrolanId, {user_name}!*
+
+🤖 *Tentang ObrolanId:*
+Bot untuk chat anonim dengan orang-orang baru dari seluruh Indonesia dan dunia!
+
+✨ *Fitur Utama:*
+• 💬 Chat anonim 1-on-1
+• 🔍 Cari partner secara acak
+• 👥 Profil lengkap dengan foto dan bio
+• 🎯 Search Pro (filter gender, hobi, umur)
+• 🎮 Quiz berhadiah poin
+• 🔒 Mode rahasia
+• 🌐 Support Bahasa Indonesia & English
+
+📋 *Perintah Utama:*
+/start - Tampilkan menu utama
+/profile - Lengkapi profil untuk pengalaman terbaik
+/find - Cari partner chat
+/help - Bantuan lengkap
+/stats - Lihat statistik bot
+
+💡 *Tips:* Lengkapi profil untuk hasil pencarian yang lebih baik!
+        """
+        
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Lengkapi Profil", callback_data="complete_profile")],
-            [InlineKeyboardButton("Lanjutkan & Cari Acak", callback_data="skip_profile")]
+            [InlineKeyboardButton("📝 Lengkapi Profil", callback_data="complete_profile")],
+            [InlineKeyboardButton("🔍 Langsung Cari Partner", callback_data="skip_profile")]
         ])
+        
         await update.message.reply_text(
-            "👋 Selamat datang di Anonymous Chat!\n"
-            "Bot ini memungkinkan kamu chat anonim dengan orang lain.\n\n"
-            "Profilmu belum lengkap. Lengkapi profil untuk pengalaman yang lebih baik!",
+            welcome_text,
+            parse_mode='Markdown',
             reply_markup=keyboard
         )
         return
     
+    # Returning user
+    pro_status = "✨ Pro User" if is_user_pro(user_id) else "📋 Regular User"
+    points = profile.get('points', 0)
+    
     await update.message.reply_text(
-        "🎉 Selamat datang kembali!\n"
-        "Pilih menu di bawah untuk memulai:",
+        f"🎉 Selamat datang kembali, {user_name}!\n\n"
+        f"{pro_status} • 📊 Poin: {points}\n\n"
+        f"Pilih menu di bawah untuk memulai:",
         reply_markup=get_main_menu()
     )
 
@@ -82,35 +118,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Help command - show available commands"""
     help_text = """
-🤖 *Anonymous Chat Bot - Help*
+ 🤖 *ObrolanId - Help & Commands*
 
-*Perintah Utama:*
-/start - Mulai bot dan lihat menu utama
-/profile - Atur profil kamu
-/help - Tampilkan bantuan ini
+ *Perintah Utama:*
+ /start - Mulai bot dan lihat menu utama
+ /profile - Atur profil kamu
+ /find - Cari partner chat
+ /help - Tampilkan bantuan ini
+ /stats - Lihat statistik bot
 
-*Fitur Chat:*
-• Find a partner - Cari partner chat acak
-• Search Pro - Pencarian advanced (Pro users)
-• Next - Ganti partner saat chat
-• Stop - Akhiri chat
+ *Fitur Chat:*
+ • Find a partner - Cari partner chat acak
+ • Search Pro - Pencarian advanced (Pro users)
+ • Next - Ganti partner saat chat
+ • Stop - Akhiri chat
 
-*Fitur Lain:*
-• My Profile - Lihat dan edit profil
-• Play Quiz - Main quiz berhadiah
-• Join Group - Gabung group chat
-• Secret Mode - Mode pesan sementara
-• Feedback - Beri rating partner
+ *Fitur Lain:*
+ • My Profile - Lihat dan edit profil
+ • Play Quiz - Main quiz berhadiah
+ • Join Group - Gabung group chat
+ • Secret Mode - Mode pesan sementara
+ • Feedback - Beri rating partner
 
-*Pro Features:*
-✨ Pencarian berdasarkan gender, hobi, dan umur
-✨ Priority matching
-✨ Akses fitur premium
+ *Pro Features:*
+ ✨ Pencarian berdasarkan gender, hobi, dan umur
+ ✨ Priority matching
+ ✨ Akses fitur premium
 
-*Tips:*
-- Lengkapi profil untuk pengalaman terbaik
-- Gunakan /report untuk laporkan user bermasalah
-- Hormati pengguna lain dan ikuti aturan
+ *Tips:*
+ - Profil lengkap = hasil pencarian lebih baik
+ - Gunakan /report untuk laporkan user bermasalah
+ - Hormati pengguna lain dan ikuti aturan
+ - User tanpa profil tetap bisa chat (mode basic)
     """
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
@@ -327,19 +366,35 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
     
     if query.data == "complete_profile":
         await query.edit_message_text("Mari lengkapi profil!")
-        await profile_command(update, context)
+        # For callback queries, we need to create a fake message object
+        fake_update = Update(
+            update_id=update.update_id,
+            message=query.message,
+            callback_query=None
+        )
+        await profile_command(fake_update, context)
     
     elif query.data == "skip_profile":
         await query.edit_message_text(
             "⚠️ Profil tidak lengkap mungkin mempengaruhi pengalaman chat kamu."
         )
-        await start_chat(update, context)
+        fake_update = Update(
+            update_id=update.update_id,
+            message=query.message,
+            callback_query=None
+        )
+        await start_chat(fake_update, context)
     
     elif query.data == "edit_profile":
         await query.edit_message_text("Gunakan /profile untuk mengedit profil.")
     
     elif query.data == "view_stats":
-        await stats_command(update, context)
+        fake_update = Update(
+            update_id=update.update_id,
+            message=query.message,
+            callback_query=None
+        )
+        await stats_command(fake_update, context)
 
 # ========== Message Handlers ==========
 
